@@ -4,7 +4,6 @@ import {
     EventEmitter,
     inject,
     Input,
-    OnDestroy,
     OnInit,
     Output,
     signal
@@ -42,7 +41,7 @@ import { SearchListDefinition } from '../motion-extension-field/motion-extension
     changeDetection: ChangeDetectionStrategy.OnPush,
     standalone: false
 })
-export class MotionMetaDataComponent extends BaseMotionDetailChildComponent implements OnInit, OnDestroy {
+export class MotionMetaDataComponent extends BaseMotionDetailChildComponent implements OnInit {
     public categories$: Observable<ViewMotionCategory[]> = this.categoryRepo.getViewModelListObservable();
     public tags$: Observable<ViewTag[]> = this.tagRepo.getViewModelListObservable();
     public motionBlocks$: Observable<MotionBlock[]> = this.blockRepo.getViewModelListObservable();
@@ -131,9 +130,9 @@ export class MotionMetaDataComponent extends BaseMotionDetailChildComponent impl
 
     public refreshOriginMotions(): void {
         const futureList: ViewMotion[] =
-            this.displayFutureForward() && this.motion.all_derived_motions ? this.motion.all_derived_motions : [];
+            this.displayFutureForward() && this.motion.all_derived_motions ? [...this.motion.all_derived_motions] : [];
         const pastList: ViewMotion[] =
-            this.displayFutureForward() || this.motion.origin_id ? this.motion.all_origins : [];
+            this.displayFutureForward() || this.motion.origin_id ? [...this.motion.all_origins] : [];
 
         if (this.displayFutureForward()) {
             if (futureList.length > 0 || pastList.length > 0) {
@@ -176,7 +175,6 @@ export class MotionMetaDataComponent extends BaseMotionDetailChildComponent impl
      * The subscription to the recommender config variable.
      */
     private recommenderSubscription: Subscription | null = null;
-    private derivedMotionSubscriptions: Subscription[] = [];
 
     public perms = inject(MotionPermissionService);
     public meetingController = inject(MeetingControllerService);
@@ -219,7 +217,11 @@ export class MotionMetaDataComponent extends BaseMotionDetailChildComponent impl
             this.originMotionStatus[motion.id] = true;
         }
 
-        this.derivedMotionSubscriptions.push(
+    }
+    }
+
+    protected override getSubscriptions(): Subscription[] {
+        return [
             this.meetingSettingsService
                 .get(`motions_enable_consultation_sequence`)
                 .pipe(map(v => !!v))
@@ -227,20 +229,12 @@ export class MotionMetaDataComponent extends BaseMotionDetailChildComponent impl
                     this.displayFutureForward.set(v);
                     this.refreshOriginMotions();
                 }),
-            this.motion.all_derived_motions$.subscribe(_ => this.refreshOriginMotions())
-        );
+            this.motion.all_derived_motions$.subscribe(() => this.refreshOriginMotions())
+        ];
     }
 
     protected override onAfterInit(): void {
         this.setupRecommender();
-    }
-
-    public override ngOnDestroy(): void {
-        super.ngOnDestroy();
-
-        for (const subscription of this.derivedMotionSubscriptions) {
-            subscription.unsubscribe();
-        }
     }
 
     /**
